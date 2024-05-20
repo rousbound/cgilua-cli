@@ -6,7 +6,7 @@ local compose = [[
 
   services:
     application:
-      image: "cgilua:latest"
+      image: "rousbound/cgilua:latest"
       tty: true
       container_name: "$$PROJECT_NAME$$"
       hostname: "$$PROJECT_NAME$$"
