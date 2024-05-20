@@ -1,12 +1,12 @@
 package = "cgilua-cli"
 version = "1.0-1"
 source = {
-    url = "https://github.com/rousbound/cgilua-cli"
+    url = "git://github.com/rousbound/cgilua-cli"
 }
 
 description = {
     summary = "CGILua CLI",
-    detailed = "CGILua CLI interface",
+    detailed = "CGILua CLI Interface",
     license = "MIT",
 }
 
@@ -17,8 +17,8 @@ dependencies = {
 
 build = {
     type = "builtin",
-    modules = {
-       sstring = "sstring.lua" 
+    modules = { 
+        sstring = "src/sstring.lua"
     },
     install = {
         bin = {
