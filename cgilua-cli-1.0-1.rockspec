@@ -22,7 +22,7 @@ build = {
     },
     install = {
         bin = {
-            cgilua = "cgilua"
+            cgilua = "src/cgilua"
         }
     }
 }
