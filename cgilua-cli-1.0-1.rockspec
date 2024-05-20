@@ -18,7 +18,6 @@ dependencies = {
 build = {
     type = "builtin",
     modules = { 
-        sstring = "src/sstring.lua"
     },
     install = {
         bin = {
