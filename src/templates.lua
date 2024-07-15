@@ -1,9 +1,4 @@
 local M = {}
--- M["cgilua.cgi"] = [[#!/bin/sh
-
--- LUAROCKS_SYSCONFDIR='/etc/luarocks' exec '/usr/bin/lua5.3' -e 'package.path="/home/app/.luarocks/share/lua/5.3/?.lua;/home/app/.luarocks/share/lua/5.3/?/init.lua;"..package.path;package.cpath="/home/app/.luarocks/lib/lua/5.3/?.so;"..package.cpath;local k,l,_=pcall(require,"luarocks.loader") _=k and l.add_context("cgilua","6.0.2-0")' '/home/app/.luarocks/lib/luarocks/rocks-5.3/cgilua/6.0.2-0/bin/cgilua.cgi' "$@"  
--- local cgilua = require"cgilua"
--- ]]
 
 M["cgilua.conf"] = [[
 <VirtualHost *:80>
@@ -119,11 +114,10 @@ services:
       ports: 
         - "$$HTTP_PORT$$:80"
 ]]
-M["Dockerfile"] =[[from rousbound/cgilua:latest 
+M["Dockerfile"] =[[from cgilua_slim:latest 
 
 copy  $$PROJECT_NAME$$-0.1-0.rockspec /tmp
-run cd /tmp && luarocks make $$PROJECT_NAME$$-0.1-0.rockspec --tree=/home/app/.luarocks PGSQL_INCDIR=/usr/include/postgresql/
-]]
+run cd /tmp && luarocks make $$PROJECT_NAME$$-0.1-0.rockspec --tree=/home/app/.luarocks ]]
 
 M["main.lua"] = [[
 #!/usr/bin/env cgilua.cgi
@@ -145,7 +139,6 @@ dependencies = {
   "wsapi >= 1.7",
   "dado >=  2.2",
   "htk >= 3.3",
-  -- "luasql-postgres >= 2.6.0",
 }
 build = {
   type = "builtin",

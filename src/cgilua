@@ -4,7 +4,7 @@ local lfs = require"lfs"
 local socket = require"socket"
 local templates = require"cgilua_cli.templates"
 
-function find_open_port(except)
+local function find_open_port(except)
     local min_port = 49152
     local max_port = 65535
     local port
@@ -32,14 +32,6 @@ local function subs (s, t)
 	return (s:gsub ("%$%$([_%w]+)%$%$", t))
 end
 
-local function install(prj, rock, extra)
-  -- local cmd = (path and ("cd ".. path .. " && ") or "") .. "luarocks install " .. rock .." --tree=luarocks --lua-version=5.3" .. " " .. (extra and table.concat(extra, " ") or "")
-  -- loca
-  -- local fh = assert(io.popen(cmd))
-  -- print(fh:read("*a"))
-  -- os.execute("sudo docker exec -u app " .. prj .. " luarocks install " .. rock .. " " .. (extra or "") .. " --local")
-end
-
 local function exec(cmd)
   print(cmd)
   os.execute(cmd)
@@ -63,12 +55,7 @@ end
 
 command("new", function(args)
     local prj = args[2]
-    local docker_compose = subs(read_template("docker-compose.yml"), {
-    			PROJECT_NAME = prj,
-    			CWD = lfs.currentdir() .. "/" .. prj,
-    })
     local http = find_open_port()
-    local ssh = find_open_port(http)
     local paths = {
     	"/logs",
     	"/src",
@@ -78,6 +65,7 @@ command("new", function(args)
     	"/src/shell",
     	"/src/modules",
     	"/backup",
+    	"/luarocks",
     	-- { "/src/modules/db_connection.lua", read_template("db_connection.lua") },
     	{ "/src/controller/main.lua", read_template("main.lua") },
     	{ "/src/controller/cgilua/config.lua", read_template("config.lua") },
@@ -89,7 +77,6 @@ command("new", function(args)
     			PROJECT_NAME = prj,
     			CWD = lfs.currentdir() .. "/" .. prj,
     			HTTP_PORT = http,
-    			SSH_PORT = ssh
     		},
     	},
     	{ "/" .. prj .. "-0.1-0.rockspec", read_template"rockspec.lua", { PROJECT_NAME = prj } },
@@ -113,17 +100,6 @@ command("new", function(args)
     exec("chmod a+x " .. prj .. "/src/controller/main.lua")
 end)
 
-
--- command("shell", function(args)
---   local t = dofile("dev.lua")
---   exec(subs("ssh -p $$SSH_PORT$$ app@localhost", {SSH_PORT = t.ssh}))
--- end)
-
--- command("db", function(args)
---   local t = dofile("dev.lua")
---   exec(subs("ssh -p $$SSH_PORT$$ app@localhost -t 'cd $$DB_FOLDER$$ && db'", {SSH_PORT = t.ssh, DB_FOLDER = t.db_folder}))
--- end)
-
 command("up",
 function(args)
   exec("sudo docker compose up -d")
@@ -138,14 +114,8 @@ end)
 
 command("install", function(args)
   local t = dofile("dev.lua")
-  install(t.project_name, args[2])
+  exec("luarocks make "..t.project_name .. "-0.1-0.rockspec --tree=luarocks --lua-version=5.3  ")
 end)
-
--- command("add", function(args)
---   write("src/controller/"..args[2], base)
---   exec("chmod a+x src/controller/"..args[2])
--- end
--- )
 
 local cmd = cmds[arg[1]]
 
