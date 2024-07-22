@@ -102,7 +102,7 @@ M["docker-compose.yml"] = [[version: '3.9'
 
 services:
     application:
-      image: "cgilua_slim:latest"
+      image: "rousbound/cgilua:22.04"
       tty: true
       container_name: "$$PROJECT_NAME$$"
       hostname: "$$PROJECT_NAME$$"
@@ -114,7 +114,7 @@ services:
       ports: 
         - "$$HTTP_PORT$$:80"
 ]]
-M["Dockerfile"] =[[from cgilua_slim:latest 
+M["Dockerfile"] =[[from rousbound/cgilua:22.04 
 
 copy  $$PROJECT_NAME$$-0.1-0.rockspec /tmp
 run cd /tmp && luarocks make $$PROJECT_NAME$$-0.1-0.rockspec --tree=/home/app/.luarocks ]]
