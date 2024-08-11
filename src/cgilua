@@ -1,26 +1,8 @@
 #!/usr/bin/lua
 local lfs = require"lfs"
-
-local socket = require"socket"
+local server = require"cgilua_cli.server"
 local templates = require"cgilua_cli.templates"
-
-local function find_open_port(except)
-    local min_port = 49152
-    local max_port = 65535
-    local port
-
-    while true do
-        port = math.random(min_port, max_port)
-        local server = socket.tcp()
-        local result, err = server:bind("*", port)
-
-        if result and port ~= except then
-        -- if result then
-            server:close()
-            return port
-        end
-    end
-end
+local args = require"cgilua_cli.args"
 
 local read_template = function(path)
    local tmpl = templates[path]
@@ -37,51 +19,32 @@ local function exec(cmd)
   os.execute(cmd)
 end
 
-local cmds = {}
-local order = {}
-
-
-local function command(cmd, f)
-  cmds[cmd] = f
-  table.insert(order, cmd)
-end
-
-
 local function write(file_name, content)
   assert(content ~= nil, "No content for " .. file_name)
     local fh, err  = assert(io.open(file_name, "w"))
     fh:write(content)
 end
 
-command("new", function(args)
-    local prj = args[2]
-    local http = find_open_port()
+ 
+local nome_arq = arg[0]
+local opcoes = {
+	_nome = nome_arq.." [OPÇÕES]*",
+
+	new = {"Creates new project"},
+	start = "Start dummy webserver",
+	install = "Install rockspec dependencies",
+}
+local arg = args.get (opcoes, ...)
+
+if arg.new then
+  local prj = arg.new
     local paths = {
-    	"/logs",
     	"/src",
-    	"/src/migrations",
-    	"/src/controller",
-    	"/src/controller/cgilua",
-    	"/src/shell",
     	"/src/modules",
-    	"/backup",
-    	"/luarocks",
-    	-- { "/src/modules/db_connection.lua", read_template("db_connection.lua") },
-    	{ "/src/controller/main.lua", read_template("main.lua") },
-    	{ "/src/controller/cgilua/config.lua", read_template("config.lua") },
-    	{ "/dev.lua", read_template"dev.lua", {HTTP_PORT = http, PROJECT_NAME = prj} },
-    	{
-    		"/docker-compose.yml",
-    		read_template("docker-compose.yml"),
-    		{
-    			PROJECT_NAME = prj,
-    			CWD = lfs.currentdir() .. "/" .. prj,
-    			HTTP_PORT = http,
-    		},
-    	},
+    	"/src/cgi-bin",
+    	"/src/luarocks",
+    	{ "/src/cgi-bin/main.lua", read_template"main.lua" },
     	{ "/" .. prj .. "-0.1-0.rockspec", read_template"rockspec.lua", { PROJECT_NAME = prj } },
-    	{ "/Dockerfile", read_template("Dockerfile"), { PROJECT_NAME = prj } },
-    	{ "/cgilua.conf", read_template("cgilua.conf") },
     }
     lfs.mkdir(prj)
     for _, path in ipairs(paths) do
@@ -97,33 +60,10 @@ command("new", function(args)
         lfs.mkdir(prj .. path)
       end
     end
-    exec("chmod a+x " .. prj .. "/src/controller/main.lua")
-end)
-
-command("up",
-function(args)
-  exec("sudo docker compose up -d")
-end)
-
-command("build",
-function(args)
-  local t = dofile("dev.lua")
-
-  exec("sudo docker build -t " .. t.project_name .. ":latest .")
-end)
-
-command("install", function(args)
-  local t = dofile("dev.lua")
-  exec("luarocks make "..t.project_name .. "-0.1-0.rockspec --tree=luarocks --lua-version=5.3  ")
-end)
-
-local cmd = cmds[arg[1]]
-
-if cmd then
-  cmd(arg)
-else
-  print("Invalid argument, received: " .. table.concat(arg," ") .. "\n"..
-    "Expected: one of the following: \n  " .. table.concat(order, "\n  ")
-  )
+elseif arg.start then
+  server.start(8765)
+elseif arg.install then
+  exec("luarocks make *.rockspec --lua-version=5.3 --tree=src/luarocks")
 end
+
 
