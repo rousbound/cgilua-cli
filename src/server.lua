@@ -1,5 +1,6 @@
 local socket = require("socket")
 local lfs = require"lfs"
+local urlcode = require"cgilua.urlcode"
 
 
 local M = {}
@@ -22,17 +23,18 @@ local function read_file(file_path)
     return content
 end
 
+
 local function execute_script(script_path, query_string)
     print("executing script:" ..script_path )
-    if script_path:match("%.%.") and script_path:match("[/\\]") and not script_path:match("%.lua$") then
-        return print"Path trasversal error"
-    end
+    -- if script_path:match("%.%.") and script_path:match("[/\\]") and not script_path:match("%.lua$") then
+    --     return print"Path trasversal error"
+    -- end
     local command = "./" .. script_path
-    if query_string then
-        command = command .. " " .. query_string
-    end
+    -- if query_string then
+    --     command = command .. " arg=1"-- .. query_string
+    -- end
     local cwd = lfs.currentdir()
-    local handle = io.popen("export DOCUMENT_ROOT=" .. cwd .. " && " .. command)
+    local handle = io.popen("export QUERY_STRING=".. urlcode.escape(query_string) ..  " && export DOCUMENT_ROOT=" .. cwd .. " && " .. command)
     local result = handle:read("*a")
     handle:close()
     return result
@@ -54,8 +56,9 @@ local function handle_request(client)
         path = "index.lua"
     end
 
+    print(path, query_string)
     if path and file_exists(path) then
-        if path:match("%.lua$") then
+        if path:match("%.lua") then
             local response = execute_script(path, query_string)
             if response then
                 client:send("HTTP/1.1 200 OK\n"  .. response)
