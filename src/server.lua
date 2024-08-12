@@ -23,6 +23,10 @@ local function read_file(file_path)
 end
 
 local function execute_script(script_path, query_string)
+    print("executing script:" ..script_path )
+    if script_path:match("%.%.") and script_path:match("[/\\]") and not script_path:match("%.lua$") then
+        return print"Path trasversal error"
+    end
     local command = "./" .. script_path
     if query_string then
         command = command .. " " .. query_string
@@ -50,10 +54,16 @@ local function handle_request(client)
         path = "index.lua"
     end
 
-    if file_exists(path) then
+    path = path:match"[a-zA-Z_-]+%.lua"
+
+    if path and file_exists(path) then
         if path:match("%.lua$") then
             local response = execute_script(path, query_string)
-            client:send("HTTP/1.1 200 OK\n" ..response)
+            if response then
+                client:send("HTTP/1.1 200 OK\n"  .. response)
+            else
+                client:send("HTTP/1.1 403 Forbidden\r\n\r\n")
+            end
         else
             local content = read_file(path)
             if content then

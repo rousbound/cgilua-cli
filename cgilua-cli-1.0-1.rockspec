@@ -20,7 +20,6 @@ build = {
     modules = { 
         ["cgilua_cli.templates"] = "src/templates.lua",
         ["cgilua_cli.server"] = "src/server.lua",
-        ["cgilua_cli.args"] = "src/args.lua"
     },
     install = {
         bin = {
