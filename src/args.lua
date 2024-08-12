@@ -18,7 +18,7 @@ function M.listoptions (options)
 	if options._description then
 		print(options._description, '\n')
 	end
-    print ("Usage: "..options._nome)
+    print ("Usage: "..options._name)
     for op, exp in pairs (options) do
         if exp == "list" then
             exp = "Show this list"
@@ -45,7 +45,7 @@ end
 -- then the option is a simple flag;
 -- if the value is a table (the string at position [1] will be displayed by 
 -- listoptions), then this option should be followed by a value.
--- @param opcoes Table with the valid options.
+-- @param options Table with the valid options.
 -- @return Table with the processed options.
 function M.get(options, ...)
     local res = {}
@@ -54,7 +54,8 @@ function M.get(options, ...)
     while args[i] do
         local a = args[i]
         if a:sub(1,1) == '-' then
-            local op = a:match ("^%-+(.*)")
+            -- local op = a:match ("^%-+(.*)")
+            local op = a
             local t = type (options[op])
             if t == "boolean" then
                 res[op] = true
@@ -66,7 +67,8 @@ function M.get(options, ...)
                     res[op] = true
                 end
             elseif t == "table" then
-                res[op] = assert (args[i+1], "Missing parameter for option -" .. op)
+                -- res[op] = assert (args[i+1], "Missing parameter for option -" .. op)
+                res[op] = args[i+1]
                 i = i + 1
             else
                 M.listoptions (options)

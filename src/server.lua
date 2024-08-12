@@ -1,30 +1,13 @@
 local socket = require("socket")
+local lfs = require"lfs"
 
 
 local M = {}
 
-
-local function find_open_port(except)
-    local min_port = 49152
-    local max_port = 65535
-    local port
-
-    while true do
-        port = math.random(min_port, max_port)
-        local sv = socket.tcp()
-        local result, err = sv:bind("*", port)
-
-        if result and port ~= except then
-        -- if result then
-            sv:close()
-            return port
-        end
-    end
-end
 local function file_exists(path)
     local file = io.open(path, "r")
     if file then
-        file:close()
+        -- file:close()
         return true
     else
         return false
@@ -44,7 +27,8 @@ local function execute_script(script_path, query_string)
     if query_string then
         command = command .. " " .. query_string
     end
-    local handle = io.popen(command)
+    local cwd = lfs.currentdir()
+    local handle = io.popen("export DOCUMENT_ROOT=" .. cwd .. " && " .. command)
     local result = handle:read("*a")
     handle:close()
     return result
@@ -84,6 +68,8 @@ local function handle_request(client)
                     content_type = "image/png"
                 elseif path:match("%.jpg$") or path:match("%.jpeg$") then
                     content_type = "image/jpeg"
+                elseif path:match("%.pdf$") or path:match("%.pdf$") then
+                    content_type = "application/pdf"
                 end
                 client:send("HTTP/1.1 200 OK\r\nContent-Type: " .. content_type .. "\r\n\r\n" .. content)
             else
@@ -96,7 +82,6 @@ local function handle_request(client)
 end
 
 function M.start(port)
-    port = port or find_open_port()
     print("HTTP server running on port " .. port)
     local server = assert(socket.bind("*", port))
     local ip, port = server:getsockname()

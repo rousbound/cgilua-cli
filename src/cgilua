@@ -2,7 +2,7 @@
 local lfs = require"lfs"
 local server = require"cgilua_cli.server"
 local templates = require"cgilua_cli.templates"
-local args = require"cgilua_cli.args"
+-- local args = require"cgilua_cli.args"
 
 local read_template = function(path)
    local tmpl = templates[path]
@@ -25,16 +25,11 @@ local function write(file_name, content)
     fh:write(content)
 end
 
- 
-local nome_arq = arg[0]
-local opcoes = {
-	_nome = nome_arq.." [OPÇÕES]*",
-
-	new = {"Creates new project"},
-	start = "Start dummy webserver",
-	install = "Install rockspec dependencies",
+local arg = {
+  new = arg[1] == "new" and arg[2],
+  start = arg[1] == "start" and arg[2] or 8000
 }
-local arg = args.get (opcoes, ...)
+
 
 if arg.new then
   local prj = arg.new
@@ -42,8 +37,9 @@ if arg.new then
     	"/src",
     	"/src/modules",
     	"/src/cgi-bin",
-    	"/src/luarocks",
+    	"/src/cgi-bin/cgilua",
     	{ "/src/cgi-bin/main.lua", read_template"main.lua" },
+    	{ "/src/cgi-bin/cgilua/config.lua", read_template"config.lua" },
     	{ "/" .. prj .. "-0.1-0.rockspec", read_template"rockspec.lua", { PROJECT_NAME = prj } },
     }
     lfs.mkdir(prj)
@@ -61,9 +57,8 @@ if arg.new then
       end
     end
 elseif arg.start then
-  server.start(8765)
-elseif arg.install then
-  exec("luarocks make *.rockspec --lua-version=5.3 --tree=src/luarocks")
+  server.start(arg.start)
 end
+
 
 

@@ -1,25 +1,8 @@
 local M = {}
 
-M["cgilua.conf"] = [[
-<VirtualHost *:80>
-    ServerAlias *
-    DocumentRoot /home/app/src/controller 
-    ErrorLog /home/app/logs/error.log 
-    CustomLog /home/app/logs/access.log combined
-
-    <Directory /home/app/src/controller >
-        DirectoryIndex main.lua
-        Options FollowSymLinks ExecCGI
-        AddHandler cgi-script .lua
-        AllowOverride None
-        Allow from all
-        Require all granted
-    </Directory>
-</VirtualHost>
-]]
 
 M["config.lua"] = [[local lib_dir = {
-  "/home/app/src/modules"
+  "../modules"
 }
 
 cgilua.addopenfunction (function ()
@@ -29,6 +12,7 @@ cgilua.addopenfunction (function ()
 	-- if app then
 	for i, path in ipairs(lib_dir) do
 		package.path = path.."/?.lua;"..path.."/?/init.lua;"..package.path
+		package.cpath = path.."/?.so;"..package.cpath
 	end
 	-- end
 end)
@@ -93,31 +77,6 @@ M["db_connection.lua"] = [[local dado = require"dado"
 return dado.connect("nil", "nil", "nil", "duckdb", "db")
 ]]
 
-M["dev.lua"] = [[return {http = "$$HTTP_PORT$$",
-project_name = "$$PROJECT_NAME$$",
-}
-]]
-
-M["docker-compose.yml"] = [[version: '3.9'
-
-services:
-    application:
-      image: "rousbound/cgilua:22.04"
-      tty: true
-      container_name: "$$PROJECT_NAME$$"
-      hostname: "$$PROJECT_NAME$$"
-      volumes:
-        - "$$CWD$$/src:/home/app/src"
-        - "$$CWD$$/logs:/home/app/logs"
-        - "$$CWD$$/backup:/home/app/backup"
-        - "$$CWD$$/luarocks:/home/app/.luarocks"
-      ports: 
-        - "$$HTTP_PORT$$:80"
-]]
-M["Dockerfile"] =[[from rousbound/cgilua:22.04 
-
-copy  $$PROJECT_NAME$$-0.1-0.rockspec /tmp
-run cd /tmp && luarocks make $$PROJECT_NAME$$-0.1-0.rockspec --tree=/home/app/.luarocks ]]
 
 M["main.lua"] = [[
 #!/usr/bin/env cgilua.cgi
@@ -137,7 +96,6 @@ description = {
 dependencies = {
   "cgilua >= 6.0",
   "wsapi >= 1.7",
-  "dado >=  2.2",
   "htk >= 3.3",
 }
 build = {
