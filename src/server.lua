@@ -87,6 +87,7 @@ local function handle_request(client)
             end
         end
     else
+        print("Path not found:" .. tostring(path))
         client:send("HTTP/1.1 404 Not Found\r\n\r\n")
     end
 end
