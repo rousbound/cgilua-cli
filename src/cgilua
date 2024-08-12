@@ -27,9 +27,16 @@ end
 
 local arg = {
   new = arg[1] == "new" and arg[2],
-  start = arg[1] == "start" and arg[2] or 8000
+  start = arg[1] == "start" and arg[2],
 }
 
+if not arg.new and not arg.start then
+  print[[
+Usage: cgilua COMMAND
+
+  new       Create new cgilua project with the specified name. 
+  start     Start dummy HTTP server on the specified port. Default: 8000]]
+end
 
 if arg.new then
   local prj = arg.new
@@ -57,7 +64,7 @@ if arg.new then
       end
     end
 elseif arg.start then
-  server.start(arg.start)
+  server.start(arg.start or 8000)
 end
 
 
