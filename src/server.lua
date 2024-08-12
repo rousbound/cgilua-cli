@@ -54,8 +54,6 @@ local function handle_request(client)
         path = "index.lua"
     end
 
-    path = path:match"[a-zA-Z_-]+%.lua"
-
     if path and file_exists(path) then
         if path:match("%.lua$") then
             local response = execute_script(path, query_string)
