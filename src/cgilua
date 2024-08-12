@@ -27,7 +27,7 @@ end
 
 local arg = {
   new = arg[1] == "new" and arg[2],
-  start = arg[1] == "start" and arg[2],
+  start = arg[1] == "start" and (arg[2] or 8000),
 }
 
 if not arg.new and not arg.start then
@@ -64,6 +64,7 @@ if arg.new then
       end
     end
 elseif arg.start then
+  print"\27[31mThis is a server for DEVELOPMENT purposes only. Do NOT use this in production.\27[0m"
   server.start(arg.start or 8000)
 end
 
