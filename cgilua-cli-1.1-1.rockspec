@@ -12,6 +12,7 @@ description = {
 
 dependencies = {
     "lua = 5.3",
+    "cgilua >= 6.0",
     "luafilesystem"
 }
 
