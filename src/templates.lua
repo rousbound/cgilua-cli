@@ -78,7 +78,7 @@ return dado.connect("nil", "nil", "nil", "duckdb", "db")
 ]]
 
 
-M["main.lua"] = [[
+M["index.lua"] = [[
 #!/usr/bin/env cgilua.cgi
 
 cgilua.put("Hello Lua!")

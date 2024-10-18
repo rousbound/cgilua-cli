@@ -1,5 +1,6 @@
 local socket = require("socket")
 local lfs = require"lfs"
+local table = require"luar.table"
 local urlcode = require"cgilua.urlcode"
 
 
@@ -23,10 +24,13 @@ local function read_file(file_path)
     return content
 end
 
+local function _print(...)
+end
 
-local function execute_script(script_path, query_string, post_data, method, content_length, content_type)
+
+local function execute_script(script_path, query_string, post_data, method, content_length, content_type, headers)
     script_path = script_path == "/" and "main.lua" or script_path
-    print("executing script:" ..script_path )
+    _print("executing script:" ..script_path )
     -- if script_path:match("%.%.") and script_path:match("[/\\]") and not script_path:match("%.lua$") then
     --     return print"Path trasversal error"
     -- end
@@ -36,13 +40,20 @@ local function execute_script(script_path, query_string, post_data, method, cont
     local cwd = lfs.currentdir()
     -- local handle = io.popen("export QUERY_STRING='" .. query_string ..  "' && export POST_STRING='"..(post_data or "") .."' && export DOCUMENT_ROOT=" .. cwd .. " && " .. command .. " " .. (post_data or ""))
     -- local method = post_data and "POST" or "GET"
-    local vars = {
-        CONTENT_LENGTH = content_length,
-        CONTENT_TYPE = content_type,
-        REQUEST_METHOD = method,
-        QUERY_STRING = query_string,
-        DOCUMENT_ROOT = cwd
-    }
+    local vars = {}
+    vars.CONTENT_LENGTH = content_length
+    vars.CONTENT_TYPE = content_type
+    vars.REQUEST_METHOD = method
+    vars.QUERY_STRING = query_string
+    vars.DOCUMENT_ROOT = cwd
+    for k,v in pairs(headers) do
+        if k:match("hx") then
+            vars["HTTP_"..(k:upper():gsub("-", "_"))] = v
+        end
+    end
+    for k,v in pairs(vars) do
+        _print(k,v)
+    end
     local ivars ={}
     for k,v in pairs(vars) do
         table.insert(ivars, "export " .. k .. "='" .. v .. "'")
@@ -54,12 +65,12 @@ local function execute_script(script_path, query_string, post_data, method, cont
         cmd = cmd .. " " .. "echo -n '" .. post_data .. "' | "
     end
     cmd = cmd .. " ./" .. script_path
-    print("CGI command:" .. cmd)
+    _print("CGI command:" .. cmd)
     local handle, err = io.popen(cmd)
     assert(handle, err)
 
     local result = handle:read("*a")
-    print("Result:"  .. (result or ""))
+    _print("Result:"  .. (result or ""))
     handle:close()
     return result
 end
@@ -67,7 +78,7 @@ end
 local function handle_request(client)
     local request, err = client:receive()
     if not request then
-        print("Error receiving request: " .. err)
+        _print("Error receiving request: " .. err)
         return
     end
     local method, path, query_string = request:match("^(%w+)%s+([^?%s]+)%??([^%s]*)%s+HTTP/%d%.%d")
@@ -100,19 +111,22 @@ local function handle_request(client)
         end
         content_type = headers["content-type"]
     end
-
-    print("Method:", method)
-    print("Path:", path)
-    print("Query String:", query_string)
-    if post_data then
-        print("POST Data:", post_data or "No POST data")
-        print("Content Length:", content_length or "")
+    if path:match"lua" then
+        print(table.tostring(headers))
     end
 
-    print(path, query_string)
+    _print("Method:", method)
+    _print("Path:", path)
+    _print("Query String:", query_string)
+    if post_data then
+        _print("POST Data:", post_data or "No POST data")
+        _print("Content Length:", content_length or "")
+    end
+
+    _print(path, query_string)
     if path and file_exists(path) then
         if path:match("%.lua") then
-            local response = execute_script(path, query_string, post_data, method, content_length, content_type)
+            local response = execute_script(path, query_string, post_data, method, content_length, content_type, headers)
             if response then
                 client:send("HTTP/1.1 200 OK\n"  .. response)
             else
@@ -143,13 +157,13 @@ local function handle_request(client)
             end
         end
     else
-        print("Path not found:" .. tostring(path))
+        _print("Path not found:" .. tostring(path))
         client:send("HTTP/1.1 404 Not Found\r\n\r\n")
     end
 end
 
 function M.start(port)
-    print("HTTP server running on port " .. port)
+    _print("HTTP server running on port " .. port)
     local server = assert(socket.bind("*", port))
     local ip, port = server:getsockname()
     while true do

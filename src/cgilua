@@ -45,7 +45,7 @@ if arg.new then
     	"/src/modules",
     	"/src/cgi-bin",
     	"/src/cgi-bin/cgilua",
-    	{ "/src/cgi-bin/main.lua", read_template"main.lua" },
+    	{ "/src/cgi-bin/index.lua", read_template"index.lua" },
     	{ "/src/cgi-bin/cgilua/config.lua", read_template"config.lua" },
     	{ "/" .. prj .. "-0.1-0.rockspec", read_template"rockspec.lua", { PROJECT_NAME = prj } },
     }
