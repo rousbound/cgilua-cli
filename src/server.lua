@@ -3,17 +3,11 @@ local lfs = require"lfs"
 local table = require"luar.table"
 local urlcode = require"cgilua.urlcode"
 
-
 local M = {}
 
 local function file_exists(path)
-    local file = io.open(path, "r")
-    if file then
-        -- file:close()
-        return true
-    else
-        return false
-    end
+    local attr = lfs.attributes(path)
+    return attr ~= nil and attr.mode == "file"
 end
 
 local function read_file(file_path)
@@ -24,148 +18,187 @@ local function read_file(file_path)
     return content
 end
 
-local function _print(...)
-end
 
+local allowed_methods = {
+    GET = 1, POST = 1, PATCH = 1,
+    HEAD = 1, PUT = 1, DELETE = 1,
+    CONNECT = 1, OPTIONS = 1, TRACE = 1,
+}
 
-local function execute_script(script_path, query_string, post_data, method, content_length, content_type, headers)
-    script_path = script_path == "/" and "main.lua" or script_path
-    _print("executing script:" ..script_path )
-    -- if script_path:match("%.%.") and script_path:match("[/\\]") and not script_path:match("%.lua$") then
-    --     return print"Path trasversal error"
-    -- end
-    -- if query_string then
-    --     command = command .. " arg=1"-- .. query_string
-    -- end
-    local cwd = lfs.currentdir()
-    -- local handle = io.popen("export QUERY_STRING='" .. query_string ..  "' && export POST_STRING='"..(post_data or "") .."' && export DOCUMENT_ROOT=" .. cwd .. " && " .. command .. " " .. (post_data or ""))
-    -- local method = post_data and "POST" or "GET"
-    local vars = {}
-    vars.CONTENT_LENGTH = content_length
-    vars.CONTENT_TYPE = content_type
-    vars.REQUEST_METHOD = method
-    vars.QUERY_STRING = query_string
-    vars.DOCUMENT_ROOT = cwd
-    for k,v in pairs(headers) do
-        if k:match("hx") then
-            vars["HTTP_"..(k:upper():gsub("-", "_"))] = v
+-- Define a table with pattern matches for content types
+local content_types = {
+    -- Text/HTML-related formats
+    { pattern = "%.html?$", content_type = "text/html" },
+    { pattern = "%.css$", content_type = "text/css" },
+    { pattern = "%.js$", content_type = "application/javascript" },
+    { pattern = "%.xml$", content_type = "application/xml" },
+    { pattern = "%.json$", content_type = "application/json" },
+    { pattern = "%.txt$", content_type = "text/plain" },
+    { pattern = "%.md$", content_type = "text/markdown" },
+
+    -- Image formats
+    { pattern = "%.png$", content_type = "image/png" },
+    { pattern = "%.jpg$", content_type = "image/jpeg" },
+    { pattern = "%.jpeg$", content_type = "image/jpeg" },
+    { pattern = "%.gif$", content_type = "image/gif" },
+    { pattern = "%.bmp$", content_type = "image/bmp" },
+    { pattern = "%.ico$", content_type = "image/x-icon" },
+    { pattern = "%.tiff?$", content_type = "image/tiff" },
+    { pattern = "%.webp$", content_type = "image/webp" },
+    { pattern = "%.svg$", content_type = "image/svg+xml" },
+
+    -- Video formats
+    { pattern = "%.mp4$", content_type = "video/mp4" },
+    { pattern = "%.mkv$", content_type = "video/x-matroska" },
+    { pattern = "%.webm$", content_type = "video/webm" },
+    { pattern = "%.ogv$", content_type = "video/ogg" },
+    { pattern = "%.avi$", content_type = "video/x-msvideo" },
+    { pattern = "%.mov$", content_type = "video/quicktime" },
+    { pattern = "%.wmv$", content_type = "video/x-ms-wmv" },
+    { pattern = "%.flv$", content_type = "video/x-flv" },
+    { pattern = "%.mpeg$", content_type = "video/mpeg" },
+
+    -- Audio formats
+    { pattern = "%.mp3$", content_type = "audio/mpeg" },
+    { pattern = "%.wav$", content_type = "audio/wav" },
+    { pattern = "%.ogg$", content_type = "audio/ogg" },
+    { pattern = "%.flac$", content_type = "audio/flac" },
+    { pattern = "%.aac$", content_type = "audio/aac" },
+    { pattern = "%.m4a$", content_type = "audio/x-m4a" },
+    { pattern = "%.weba$", content_type = "audio/webm" },
+
+    -- Document formats
+    { pattern = "%.pdf$", content_type = "application/pdf" },
+    { pattern = "%.doc$", content_type = "application/msword" },
+    { pattern = "%.docx$", content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+    { pattern = "%.xls$", content_type = "application/vnd.ms-excel" },
+    { pattern = "%.xlsx$", content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+    { pattern = "%.ppt$", content_type = "application/vnd.ms-powerpoint" },
+    { pattern = "%.pptx$", content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation" },
+    { pattern = "%.odt$", content_type = "application/vnd.oasis.opendocument.text" },
+    { pattern = "%.ods$", content_type = "application/vnd.oasis.opendocument.spreadsheet" },
+
+    -- Archive formats
+    { pattern = "%.zip$", content_type = "application/zip" },
+    { pattern = "%.tar$", content_type = "application/x-tar" },
+    { pattern = "%.gz$", content_type = "application/gzip" },
+    { pattern = "%.bz2$", content_type = "application/x-bzip2" },
+    { pattern = "%.7z$", content_type = "application/x-7z-compressed" },
+    { pattern = "%.rar$", content_type = "application/vnd.rar" },
+
+    -- Application formats
+    { pattern = "%.exe$", content_type = "application/vnd.microsoft.portable-executable" },
+    { pattern = "%.msi$", content_type = "application/x-msi" },
+    { pattern = "%.deb$", content_type = "application/vnd.debian.binary-package" },
+    { pattern = "%.rpm$", content_type = "application/x-rpm" },
+    { pattern = "%.apk$", content_type = "application/vnd.android.package-archive" },
+
+    -- Font formats
+    { pattern = "%.woff$", content_type = "font/woff" },
+    { pattern = "%.woff2$", content_type = "font/woff2" },
+    { pattern = "%.ttf$", content_type = "font/ttf" },
+    { pattern = "%.otf$", content_type = "font/otf" },
+
+    -- Miscellaneous formats
+    { pattern = "%.csv$", content_type = "text/csv" },
+    { pattern = "%.tsv$", content_type = "text/tab-separated-values" },
+    { pattern = "%.ics$", content_type = "text/calendar" },
+    { pattern = "%.rtf$", content_type = "application/rtf" },
+    { pattern = "%.swf$", content_type = "application/x-shockwave-flash" },
+    { pattern = "%.eot$", content_type = "application/vnd.ms-fontobject" },
+    
+    -- Default fallback
+    { pattern = "%.txt$", content_type = "text/plain" } -- Fallback if nothing else matches
+}
+
+local function get_content_type(path)
+    for _, entry in ipairs(content_types) do
+        if path:match(entry.pattern) then
+            return entry.content_type
         end
     end
-    for k,v in pairs(vars) do
-        _print(k,v)
-    end
-    local ivars ={}
-    for k,v in pairs(vars) do
-        table.insert(ivars, "export " .. k .. "='" .. v .. "'")
-    end
-    local exports = table.concat(ivars, " && ")
-    -- local cmd = exports .. " && " ..post_data .. " ./"..script_path
-    local cmd = exports .. " && "
-    if method == "POST" then
-        cmd = cmd .. " " .. "echo -n '" .. post_data .. "' | "
-    end
-    cmd = cmd .. " ./" .. script_path
-    _print("CGI command:" .. cmd)
-    local handle, err = io.popen(cmd)
-    assert(handle, err)
+    return "text/plain"
+end
 
-    local result = handle:read("*a")
-    _print("Result:"  .. (result or ""))
+local function execute_script(script_path, query_string, post_data, method, content_length, content_type, headers)
+    local cwd = lfs.currentdir()
+    headers.CONTENT_LENGTH = content_length
+    headers.CONTENT_TYPE = content_type
+    headers.REQUEST_METHOD = method
+    headers.QUERY_STRING = query_string
+    headers.DOCUMENT_ROOT = cwd
+
+    local env = {}
+    for k, v in pairs(headers) do
+        table.insert(env, string.format("export %s='%s'", k, v))
+    end
+
+    local exports = table.concat(env, " && ")
+    local cmd = exports .. " && "
+
+    if method == "POST" then
+        cmd = cmd .. string.format("echo -n '%s' | ", post_data)
+    end
+
+    cmd = cmd .. "./" .. script_path
+    local handle = assert(io.popen(cmd))
+    local result = handle:read"*a"
     handle:close()
     return result
 end
 
 local function handle_request(client)
-    local request, err = client:receive()
-    if not request then
-        _print("Error receiving request: " .. err)
-        return
-    end
+    local request = client:receive()
+    if not request then return end
+
     local method, path, query_string = request:match("^(%w+)%s+([^?%s]+)%??([^%s]*)%s+HTTP/%d%.%d")
-    if method ~= "GET" and method ~= "POST" then
+
+    -- From: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
+    if not allowed_methods[method] then
         client:send("HTTP/1.1 405 Method Not Allowed\r\n\r\n")
         return
     end
-    path = path:sub(2)
-    if path == "" then
-        path = "index.lua"
-    end
-    path = urlcode.unescape(path)
+
+    path = urlcode.unescape(path:sub(2))
+    if path == "" then path = "index.lua" end
 
     local headers = {}
-    while true do
-        local line, err = client:receive()
+    repeat
+        local line = client:receive()
         if not line or line == "" then break end
         local key, value = line:match("^(.-):%s*(.*)")
-        if key and value then
-            headers[key:lower()] = value
+        if key then
+            -- From: http://lunarmodules.github.io/cgilua/sapi.html#servervariable
+            headers["HTTP_" .. key:upper():gsub("-", "_")] = value 
         end
+    until not line
+
+    local post_data
+    local content_length, content_type = headers["HTTP_CONTENT_LENGTH"], headers["HTTP_CONTENT_TYPE"]
+    if method == "POST" and content_length then
+        post_data = client:receive(tonumber(content_length))
     end
 
-    local post_data = nil
-    local content_length, content_type
-    if method == "POST" then
-        content_length = tonumber(headers["content-length"])
-        if content_length then
-            post_data = client:receive(content_length)
-        end
-        content_type = headers["content-type"]
-    end
-    if path:match"lua" then
-        print(table.tostring(headers))
-    end
-
-    _print("Method:", method)
-    _print("Path:", path)
-    _print("Query String:", query_string)
-    if post_data then
-        _print("POST Data:", post_data or "No POST data")
-        _print("Content Length:", content_length or "")
-    end
-
-    _print(path, query_string)
-    if path and file_exists(path) then
-        if path:match("%.lua") then
-            local response = execute_script(path, query_string, post_data, method, content_length, content_type, headers)
-            if response then
-                client:send("HTTP/1.1 200 OK\n"  .. response)
-            else
-                client:send("HTTP/1.1 403 Forbidden\r\n\r\n")
-            end
-        else
-            local content = read_file(path)
-            if content then
-                local content_type = "text/plain"
-                if path:match("%.html$") then
-                    content_type = "text/html"
-                elseif path:match("%.css$") then
-                    content_type = "text/css"
-                elseif path:match("%.js$") then
-                    content_type = "application/javascript"
-                elseif path:match("%.png$") then
-                    content_type = "image/png"
-                elseif path:match("%.jpg$") or path:match("%.jpeg$") then
-                    content_type = "image/jpeg"
-                elseif path:match("%.pdf$") or path:match("%.pdf$") then
-                    content_type = "application/pdf"
-                elseif path:match("%.svg$") or path:match("%.svg$") then
-                    content_type = "image/svg+xml"
-                end
-                client:send("HTTP/1.1 200 OK\r\nContent-Type: " .. content_type .. "\r\n\r\n" .. content)
-            else
-                client:send("HTTP/1.1 404 Not Found\r\n\r\n")
-            end
-        end
-    else
-        _print("Path not found:" .. tostring(path))
+    if not file_exists(path) then
         client:send("HTTP/1.1 404 Not Found\r\n\r\n")
+        return 
+    end
+    if path:match"%.lua" then
+        local response = execute_script(path, query_string, post_data, method, content_length, content_type, headers)
+        client:send("HTTP/1.1 200 OK\n" .. response)
+    else
+        local content = read_file(path)
+        if content then
+            local content_type = get_content_type(path)
+            client:send("HTTP/1.1 200 OK\r\nContent-Type: " .. content_type .. "\r\n\r\n" .. content)
+        else
+            client:send("HTTP/1.1 404 Not Found\r\n\r\n")
+        end
     end
 end
 
 function M.start(port)
-    _print("HTTP server running on port " .. port)
     local server = assert(socket.bind("*", port))
-    local ip, port = server:getsockname()
     while true do
         local client = server:accept()
         client:settimeout(10)
@@ -175,3 +208,4 @@ function M.start(port)
 end
 
 return M
+
