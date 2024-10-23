@@ -120,14 +120,35 @@ local function get_content_type(path)
     return "text/plain"
 end
 
-local function execute_script(script_path, query_string, post_data, method, content_length, content_type, headers)
+-- CGI environment variables implementation
+local function execute_script(script_path, query_string, post_data, method, content_length, content_type, headers, client_ip, server_name, server_port)
     local cwd = lfs.currentdir()
-    headers.CONTENT_LENGTH = content_length
-    headers.CONTENT_TYPE = content_type
-    headers.REQUEST_METHOD = method
-    headers.QUERY_STRING = query_string
-    headers.DOCUMENT_ROOT = cwd
+    local path_info = script_path
+    local script_name = script_path:match("/[^/]*%.lua$") or script_path -- Extract script name
 
+    -- Required environment variables
+    headers.GATEWAY_INTERFACE = "CGI/1.1"
+    headers.PATH_INFO = path_info
+    headers.PATH_TRANSLATED = cwd .. path_info
+    headers.QUERY_STRING = query_string
+    headers.REMOTE_ADDR = client_ip
+    headers.REMOTE_HOST = headers["HTTP_HOST"] or server_name
+    headers.REQUEST_METHOD = method
+    headers.DOCUMENT_ROOT = cwd
+    headers.SCRIPT_NAME = script_name
+    headers.SERVER_NAME = server_name
+    headers.SERVER_PORT = tostring(server_port)
+    headers.SERVER_PROTOCOL = "HTTP/1.1"
+    headers.SERVER_SOFTWARE = "LuaSocket/CGI-Server"
+
+    -- Handle POST data
+    headers.CONTENT_LENGTH = content_length or ""
+    headers.CONTENT_TYPE = content_type or ""
+
+    -- Print all headers for debugging
+    print(table.tostring(headers))
+
+    -- Prepare environment variables for the command
     local env = {}
     for k, v in pairs(headers) do
         table.insert(env, string.format("export %s='%s'", k, v))
@@ -142,18 +163,19 @@ local function execute_script(script_path, query_string, post_data, method, cont
 
     cmd = cmd .. "./" .. script_path
     local handle = assert(io.popen(cmd))
-    local result = handle:read"*a"
+    local result = handle:read("*a")
     handle:close()
     return result
 end
 
-local function handle_request(client)
+local function handle_request(client, server_name, server_port)
     local request = client:receive()
     if not request then return end
 
+    -- Extract method, path, and query string
     local method, path, query_string = request:match("^(%w+)%s+([^?%s]+)%??([^%s]*)%s+HTTP/%d%.%d")
 
-    -- From: https://developer.mozilla.org/en-US/docs/Web/HTTP/Methods
+    -- Validate the method
     if not allowed_methods[method] then
         client:send("HTTP/1.1 405 Method Not Allowed\r\n\r\n")
         return
@@ -162,31 +184,39 @@ local function handle_request(client)
     path = urlcode.unescape(path:sub(2))
     if path == "" then path = "index.lua" end
 
+    -- Parse headers
     local headers = {}
     repeat
         local line = client:receive()
         if not line or line == "" then break end
         local key, value = line:match("^(.-):%s*(.*)")
         if key then
-            -- From: http://lunarmodules.github.io/cgilua/sapi.html#servervariable
-            headers["HTTP_" .. key:upper():gsub("-", "_")] = value 
+            headers["HTTP_" .. key:upper():gsub("-", "_")] = value
         end
     until not line
 
+    -- Handle POST data if present
     local post_data
     local content_length, content_type = headers["HTTP_CONTENT_LENGTH"], headers["HTTP_CONTENT_TYPE"]
     if method == "POST" and content_length then
         post_data = client:receive(tonumber(content_length))
     end
 
+    -- Check if the file exists
     if not file_exists(path) then
         client:send("HTTP/1.1 404 Not Found\r\n\r\n")
-        return 
+        return
     end
-    if path:match"%.lua" then
-        local response = execute_script(path, query_string, post_data, method, content_length, content_type, headers)
+
+    -- Get client IP
+    local client_ip = client:getpeername()
+
+    -- Execute the script if it's a Lua file
+    if path:match("%.lua$") then
+        local response = execute_script(path, query_string, post_data, method, content_length, content_type, headers, client_ip, server_name, server_port)
         client:send("HTTP/1.1 200 OK\n" .. response)
     else
+        -- Serve static content
         local content = read_file(path)
         if content then
             local content_type = get_content_type(path)
@@ -199,13 +229,15 @@ end
 
 function M.start(port)
     local server = assert(socket.bind("*", port))
+    local server_name, server_port = server:getsockname()
+    print("Server running at http://" .. server_name .. ":" .. server_port)
+
     while true do
         local client = server:accept()
         client:settimeout(10)
-        handle_request(client)
+        handle_request(client, server_name, server_port)
         client:close()
     end
 end
 
 return M
-
