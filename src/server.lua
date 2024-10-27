@@ -1,6 +1,6 @@
 local socket = require("socket")
 local lfs = require"lfs"
-local table = require"luar.table"
+-- local table = require"luar.table"
 local urlcode = require"cgilua.urlcode"
 
 local M = {}
@@ -146,7 +146,6 @@ local function execute_script(script_path, query_string, post_data, method, cont
     headers.CONTENT_TYPE = content_type or ""
 
     -- Print all headers for debugging
-    print(table.tostring(headers))
 
     -- Prepare environment variables for the command
     local env = {}
